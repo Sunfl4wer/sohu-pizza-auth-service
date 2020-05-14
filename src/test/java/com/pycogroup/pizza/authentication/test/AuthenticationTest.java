@@ -1,6 +1,9 @@
 package com.pycogroup.pizza.authentication.test;
 
 import java.util.HashSet;
+
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import java.util.Set;
 
 import org.junit.jupiter.api.AfterEach;
@@ -22,7 +25,6 @@ import com.pycogroup.pizza.authentication.repository.RoleRepository;
 import com.pycogroup.pizza.authentication.repository.UserRepository;
 import com.pycogroup.pizza.authentication.security.jwt.JwtUtils;
 import com.pycogroup.pizza.authentication.security.service.UserDetailsImpl;
-import com.pycogroup.pizza.authentication.security.service.UserDetailsServiceImpl;
 
 @SpringBootTest
 public class AuthenticationTest {
@@ -40,20 +42,17 @@ public class AuthenticationTest {
   PasswordEncoder encoder;
 
   @Autowired
-  UserDetailsServiceImpl userDetailsServiceImpl;
-
-  @Autowired
   JwtUtils jwtUtils;
-
+  
   @BeforeEach
   public void init() {
     roleRepository.save(new Role(ERole.ROLE_USER));
     Set<Role> roles = new HashSet<>();
     Role userRole = roleRepository.findByName(ERole.ROLE_USER).get();
     roles.add(userRole);
-    User user = User.builder().firstName("Pheo").lastName("Chi")
-         .birthDate("30/02/1900").address("1 Vu Dai vilage")
-         .username("7777777").password(encoder.encode("loveyouno")).email("peacefulman@gmail.com")
+    User user = User.builder().firstName("Some").lastName("Name")
+         .birthDate("30/02/1900").address("1 Ho Chi Minh")
+         .username("7777777").password(encoder.encode("1234567")).email("peacefulman@gmail.com")
          .roles(roles)
          .build();
     userRepository.save(user);
@@ -71,17 +70,33 @@ public class AuthenticationTest {
 
     // given
     String username = "7777777";
-    String password = "loveyouno";
+    String password = "1234567";
 
     // when 
     Authentication authenticationValid = authenticationManager.authenticate(
         new UsernamePasswordAuthenticationToken(username, password));
 
     UserDetailsImpl userDetails = (UserDetailsImpl) authenticationValid.getPrincipal();
+    String userPasswordInDb = userRepository.findByUsername(username).get().getPassword();
+    
 
     // then
     Assertions.assertTrue(userDetails.isEnabled());
     Assertions.assertEquals(userDetails.getUsername(),"7777777");
+    Assertions.assertEquals("1 Ho Chi Minh", userDetails.getAddress());
+    Assertions.assertEquals("peacefulman@gmail.com", userDetails.getEmail());
+    Assertions.assertNotEquals("1234567", userPasswordInDb);
   }
   
+  public UserDetails loadUserByUsername(String phoneNumber) throws UsernameNotFoundException {
+    User user = userRepository.findByUsername(phoneNumber)
+              .orElseThrow(() -> new UsernameNotFoundException("User Not Found with username: " + phoneNumber));
+              
+    return UserDetailsImpl.build(user);
+  }
+  @Test
+  public void loadUserByUsernameTest() {
+    Throwable exception = Assertions.assertThrows(UsernameNotFoundException.class,() -> {loadUserByUsername("090949348");});
+    Assertions.assertEquals("User Not Found with username: 090949348", exception.getMessage());
+  }
 }
